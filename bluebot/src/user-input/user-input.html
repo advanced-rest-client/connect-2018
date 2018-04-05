@@ -82,7 +82,7 @@
         </div>
       </template>
       <div class="text-field">
-        <paper-input label="Say something..." no-label-float on-keydown="_inputKeydownHandler" value="{{value}}"></paper-input>
+        <paper-input id="input" label="Say something..." no-label-float on-keydown="_inputKeydownHandler" value="{{value}}"></paper-input>
         <paper-icon-button icon="botcons:send" on-click="_sendHandler"></paper-icon-button>
       </div>
     </div>
@@ -146,11 +146,20 @@
           listening: {
             type: Boolean,
             reflectToAttribute: true,
-            computed: '_computeListening(opened, micGranted, speakerEnabled)',
+            computed: '_computeListening(opened, micGranted, micEnabled)',
             observer: '_listeningChanged'
           },
-
-          speakerEnabled: Boolean
+          /**
+           * True when microphone is in use.
+           */
+          micEnabled: Boolean,
+          _firstCharRe: {
+            type: Object,
+            readOnly: true,
+            value: function() {
+              return /\S/;
+            }
+          }
         };
       }
 
@@ -160,6 +169,7 @@
         this._speachResultHandler = this._speachResultHandler.bind(this);
         this._speachErrorHandler = this._speachErrorHandler.bind(this);
         this._speachEndHandler = this._speachEndHandler.bind(this);
+        this._transcriptTimerHandler = this._transcriptTimerHandler.bind(this);
       }
 
       connectedCallback() {
@@ -236,16 +246,21 @@
         return !!(hasSpeachRecognition && (micPrompt || micGranted));
       }
 
-      _computeListening(opened, micGranted, speakerEnabled) {
-        return !!(opened && micGranted && speakerEnabled);
+      _computeListening(opened, micGranted, micEnabled) {
+        return !!(opened && micGranted && micEnabled);
       }
-
+      /**
+       * Starts the microphone listener when the `state` is true.
+       * @param {Boolean} state
+       */
       _listeningChanged(state) {
         if (state) {
           this.startListening();
         }
       }
-
+      /**
+       * Listens to the user voice input.
+       */
       startListening() {
         /* global webkitSpeechRecognition */
         if (this.__recognition) {
@@ -262,16 +277,41 @@
         this.__recognition = recognition;
         this.listening = true;
       }
-
+      /**
+       * Handler for speach recognition result event.
+       * Updates the state od the app depending on the result.
+       * @param {Event} e Speach event.
+       */
       _speachResultHandler(e) {
-        console.log(e);
+        this._cancelTimer();
+        let interim = '';
+        let transcript = '';
+        for (let i = e.resultIndex, len = e.results.length; i < len; ++i) {
+          if (e.results[i].isFinal) {
+            transcript += e.results[i][0].transcript;
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        transcript = this.capitalize(transcript);
+        interim = this.capitalize(interim);
+        if (transcript && !interim) {
+          this._updateTranscript(transcript);
+        } else if (interim) {
+          this._updateInterim(interim);
+        }
       }
-
+      /**
+       * Handler for speach error event.
+       * @param {Event} e
+       */
       _speachErrorHandler(e) {
+        this._cancelTimer();
+        this.listening = false;
+        console.log('Speach recognition error');
         switch (e.error) {
           case 'no-speech':
-            console.log('No speach');
-            this.listening = false;
+            console.log('No speach'); // Do nothing
             break;
           default:
             break;
@@ -281,12 +321,64 @@
        * Clears the recognition object when not used.
        */
       _speachEndHandler() {
+        this._cancelTimer();
         const recognition = this.__recognition;
         recognition.removeEventListener('result', this._speachResultHandler);
         recognition.removeEventListener('error', this._speachErrorHandler);
         recognition.removeEventListener('end', this._speachEndHandler);
         this.__recognition = undefined;
-        this.speakerEnabled = false;
+        this.micEnabled = false;
+        this.listening = false;
+      }
+      /**
+       * Updates the sate of user voice query when there's no final request
+       * od fpeach recognition. It removes the label and adds placeholder
+       * ewith the interm value.
+       *
+       * @param {String} query Recognized user query
+       */
+      _updateInterim(query) {
+        const input = this.$.input;
+        if (input.label) {
+          this.__originalLabel = input.label;
+          input.label = '';
+        }
+        input.placeholder = query;
+      }
+      /**
+       * This is called when final result of speach recognition is available.
+       * It sets the transcript handler so if the user speak again in about
+       * ~1000 ms it will not report the results back to the app but continue to
+       * listen.
+       *
+       * @param {String} transcript Recognized final query.
+       */
+      _updateTranscript(transcript) {
+        const input = this.$.input;
+        input.placeholder = '';
+        input.label = this.__originalLabel;
+        this.value = transcript;
+        this._transcriptTimer = setTimeout(this._transcriptTimerHandler, 1000);
+      }
+      /**
+       * This is called by the transcript timeout.
+       * Sends current query to the app
+       */
+      _transcriptTimerHandler() {
+        this._transcriptTimer = undefined;
+        this._sendHandler();
+        this._transcriptTimer = undefined;
+        this.__recognition.stop();
+      }
+      /**
+       * Cancels the transcipt timer that sends user query to the app in delay.
+       */
+      _cancelTimer() {
+        if (this._transcriptTimer === undefined) {
+          return;
+        }
+        clearTimeout(this._transcriptTimer);
+        this._transcriptTimer = undefined;
       }
       /**
        * Handler for the send button click
@@ -323,8 +415,21 @@
         if (this.listening) {
           this.__recognition.stop();
         } else if (!this.micDenied) {
-          this.speakerEnabled = true;
+          this.value = '';
+          if (this.micEnabled) {
+            this.startListening();
+          } else {
+            this.micEnabled = true;
+          }
         }
+      }
+      /**
+       * Capitalizes the sentence.
+       * @param {String} s A sentence to capitalize
+       * @return {String} Capitalized sentence.
+       */
+      capitalize(s) {
+        return s.replace(this._firstCharRe, function(m) { return m.toUpperCase(); });
       }
       /**
        * Dispatched when user finished input
