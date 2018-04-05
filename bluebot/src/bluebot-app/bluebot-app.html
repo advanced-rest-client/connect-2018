@@ -65,7 +65,7 @@
           </template>
 
           <template is="dom-repeat" items="[[messages]]" sort="_messageSort" observe="time">
-            <conversation-item thinking="[[item.thinking]]" actor="[[item.actor]]">
+            <conversation-item thinking="[[item.thinking]]" actor="[[item.actor]]" errored="[[item.errored]]">
               <template is="dom-if" if="[[item.message]]">
                 <p slot="sentence">[[item.message]]</p>
               </template>
@@ -74,11 +74,11 @@
               </template>
             </conversation-item>
           </template>
-          
+
         </section>
       </div>
     </app-header-layout>
-    <iron-ajax id="request" url="http://order-change-fullfilment.cloudhub.io/request" handle-as="json" method="POST" content-type="application/json"></iron-ajax>
+    <iron-ajax id="request" url="http://order-change-fullfilment.cloudhub.io/request" handle-as="json" method="POST" content-type="application/json" on-iron-ajax-error="_botResponseError"></iron-ajax>
   </template>
   <script>
     /**
@@ -138,7 +138,7 @@
        * @param {String} actor Actor type. `bot` or `human`. Default to `bot`.
        * @param {?String} message Message to render. If not set, the `thinking`
        * state will be forced.
-       * @param {?String} icon User icon. Default to default user image.
+       * @param {?String} icon User icon. Default to default bot icon.
        * @return {Number} Index of inserted message
        */
       appendConversationMessage(actor, message, icon) {
@@ -162,7 +162,7 @@
       }
       /**
        * Adds user input to the list of messages, sends query to the server
-       * and finally it add "thinking" bot message
+       * and finally it adds "thinking" bot message
        *
        * @param {String} query User query
        */
@@ -195,13 +195,13 @@
           debugger;
         })
         .catch(() => {
-          this.set('messages.errored', true);
+          this.set(`messages.${botIndex}.errored`, true);
         });
       }
       /**
        * Sorts messages in the view.
        *
-       * This is a CSS trics to use as less JS code as possible.
+       * This is a CSS trick to use as less JS code as possible.
        * The messages are rendered in flex layout in reverse order.
        * Meaning the repeater has to sort messages from newest to the oldest
        * so they all going to be rendered at the bottom.
@@ -210,7 +210,7 @@
        * always at the bottom.
        *
        * @todo Pawel: When the list scrolls outside the bounds for the first
-       * time it goes out of the viewport. Handle this and scroll to (0,0).
+       * time it goes out of the viewport. Handle this event and scroll to (0,0).
        *
        * @param {Object} a
        * @param {Object} b
@@ -224,6 +224,16 @@
           return 1;
         }
         return 0;
+      }
+      /**
+       * Bot server response serror handler
+       *
+       * @param {CustomEvent} e
+       */
+      _botResponseError(e) {
+        console.log(e.detail.request.response);
+        const last = this.messages.length - 1;
+        this.set(`messages.${last}.errored`, true);
       }
     }
 

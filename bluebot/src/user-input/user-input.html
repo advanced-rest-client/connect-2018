@@ -82,7 +82,7 @@
         </div>
       </template>
       <div class="text-field">
-        <paper-input label="Say something..." no-label-float on-keydown="_inputKeydownHandler" value="{{value}}" on-iron-ajax-error="_botResponseError"></paper-input>
+        <paper-input label="Say something..." no-label-float on-keydown="_inputKeydownHandler" value="{{value}}"></paper-input>
         <paper-icon-button icon="botcons:send" on-click="_sendHandler"></paper-icon-button>
       </div>
     </div>
@@ -325,10 +325,6 @@
         } else if (!this.micDenied) {
           this.speakerEnabled = true;
         }
-      }
-
-      _botResponseError(e) {
-        debugger;
       }
       /**
        * Dispatched when user finished input
