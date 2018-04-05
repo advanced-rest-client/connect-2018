@@ -1,0 +1,214 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
+<link rel="import" href="../../bower_components/anypoint-styles/typography.html">
+<link rel="import" href="../../bower_components/anypoint-styles/colors.html">
+<link rel="import" href="../botcons.html">
+<dom-module id="conversation-item">
+  <template>
+    <style>
+    :host {
+      display: block;
+      @apply --anypoint-font-body;
+    }
+
+    .content {
+      @apply --layout-horizontal;
+      @apply --layout-start;
+      margin: 0 24px;
+    }
+
+    :host([actor="human"]) .content {
+      @apply --layout-horizontal-reverse;
+    }
+
+    .triangle {
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 6px 10.4px 6px 0;
+      border-color: transparent var(--anypoint-color-teal3) transparent transparent;
+      -webkit-transform:rotate(360deg);
+    }
+
+    :host([actor="human"]) .triangle {
+      transform: rotate(180deg);
+      margin-left: -1px;
+      border-color: transparent var(--anypoint-color-aluminum1) transparent transparent;
+    }
+
+    .icon {
+      margin-top: 4px;
+    }
+
+    .icon ::slotted(*),
+    iron-icon {
+      color: #fff;
+      width: 40px;
+      height: 40px;
+    }
+
+    .message {
+      @apply --layout-horizontal;
+      @apply --layout-start;
+    }
+
+    :host([actor="human"]) .message {
+      @apply --layout-horizontal-reverse;
+    }
+
+    .triangle {
+      margin-top: 16px;
+    }
+
+    .sentence {
+      background-color: var(--anypoint-color-teal3);
+      padding: 16px;
+      border-radius: 6px;
+    }
+
+    :host([actor="human"]) .sentence {
+      background-color: var(--anypoint-color-aluminum1);
+    }
+
+    .output ::slotted(*),
+    .output .error {
+      color: #fff;
+      padding: 0;
+      margin: 0;
+      font-size: 18px;
+    }
+
+    :host([actor="human"]) .output ::slotted(*) {
+      color: var(--anypoint-color-steel3);
+    }
+
+    .loader {
+      display: none;
+    }
+
+    :host([thinking]) .loader {
+      display: block;
+    }
+
+    .spinner {
+      margin: 0 auto 0;
+      width: 70px;
+      text-align: center;
+    }
+
+    .spinner > div {
+      width: 12px;
+      height: 12px;
+      background-color: #fff;
+      border-radius: 100%;
+      display: inline-block;
+      -webkit-animation: sk-bouncedelay 1.4s infinite ease-in-out both;
+      animation: sk-bouncedelay 1.4s infinite ease-in-out both;
+    }
+
+    .spinner .bounce1 {
+      -webkit-animation-delay: -0.32s;
+      animation-delay: -0.32s;
+    }
+
+    .spinner .bounce2 {
+      -webkit-animation-delay: -0.16s;
+      animation-delay: -0.16s;
+    }
+
+    @-webkit-keyframes sk-bouncedelay {
+      0%, 80%, 100% { -webkit-transform: scale(0) }
+      40% { -webkit-transform: scale(1.0) }
+    }
+
+    @keyframes sk-bouncedelay {
+      0%, 80%, 100% {
+        -webkit-transform: scale(0);
+        transform: scale(0);
+      } 40% {
+        -webkit-transform: scale(1.0);
+        transform: scale(1.0);
+      }
+    }
+
+    :host([errored]) .loader,
+    :host([errored]) slot[name="icon"],
+    :host([errored]) slot[name="sentence"] {
+      display: none !important;
+    }
+
+    :host([errored]) iron-icon {
+      color: var(--anypoint-color-danger);
+    }
+    </style>
+    <div class="content">
+      <div class="icon">
+        <slot name="icon">
+          <iron-icon icon="botcons:android"></iron-icon>
+        </slot>
+        <template is="dom-if" if="[[errored]]">
+          <iron-icon class="error" icon="botcons:error"></iron-icon>
+        </template>
+      </div>
+      <div class="message">
+        <div class="triangle"></div>
+        <div class="sentence">
+          <span class="loader">
+            <div class="spinner">
+              <div class="bounce1"></div>
+              <div class="bounce2"></div>
+              <div class="bounce3"></div>
+            </div>
+          </span>
+          <span class="output">
+            <slot name="sentence"></slot>
+            <template is="dom-if" if="[[errored]]">
+              <span class="error">Something went wrong 💔 Server is unavailable.</span>
+            </template>
+          </span>
+        </div>
+      </div>
+    </div>
+  </template>
+  <script>
+    /**
+     * A base for conversation items between bot and the user.
+     * @customElement
+     * @polymer
+     */
+    class ConversationItem extends Polymer.Element {
+      static get is() { return 'conversation-item'; }
+      static get properties() {
+        return {
+          /**
+           * The actor of the conversation.
+           * Any of `bot`, `human`
+           */
+          actor: {
+            type: String,
+            value: 'bot',
+            reflectToAttribute: true
+          },
+          /**
+           * Shows loader instead of the response.
+           */
+          thinking: {
+            type: Boolean,
+            reflectToAttribute: true
+          },
+          /**
+           * Indicates that the response from the server was errored.
+           * It makes only sense if `actor` is `bot`.
+           */
+          errored: {
+            type: Boolean,
+            reflectToAttribute: true
+          }
+        };
+      }
+    }
+
+    window.customElements.define(ConversationItem.is, ConversationItem);
+  </script>
+</dom-module>

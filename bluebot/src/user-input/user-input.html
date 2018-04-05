@@ -1,0 +1,342 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/polymer/lib/elements/dom-if.html">
+<link rel="import" href="../../bower_components/polymer/lib/utils/render-status.html">
+<link rel="import" href="../../bower_components/anypoint-styles/typography.html">
+<link rel="import" href="../../bower_components/anypoint-styles/colors.html">
+<link rel="import" href="../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../botcons.html">
+<dom-module id="user-input">
+  <template>
+    <style>
+    :host {
+      display: block;
+      @apply --anypoint-font-body;
+    }
+
+    .user-input-container {
+      background-color: var(--anypoint-color-aluminum1);
+      padding: 16px;
+      border-radius: 6px;
+      @apply --layout-horizontal;
+      @apply --layout-center;
+      @apply --flex;
+    }
+
+    .speach-indicator {
+      margin-right: 12px;
+      position: relative;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      user-select: none;
+      @apply --layout-horizontal;
+      @apply --layout-center-center;
+    }
+
+    .text-field {
+      @apply --layout-horizontal;
+      @apply --layout-center;
+      @apply --layout-flex;
+    }
+
+    paper-input {
+      @apply --layout-flex;
+    }
+
+    .bubble {
+      background-color: var(--anypoint-color-red3);
+      width: 40px;
+      height: 40px;
+      position: absolute;
+      border-radius: 50%;
+      display: none;
+    }
+
+    :host([listening]) .bubble {
+      -webkit-animation: mic-bounce 1.4s infinite ease-in-out both;
+      animation: mic-bounce 1.4s infinite ease-in-out both;
+      display: block;
+    }
+
+    :host([listening]) .speach-indicator {
+      color: #fff;
+    }
+
+    @keyframes mic-bounce {
+      0%, 80%, 100% {
+        -webkit-transform: scale(0.5);
+        transform: scale(0.5);
+      } 40% {
+        -webkit-transform: scale(1.0);
+        transform: scale(1.0);
+      }
+    }
+    </style>
+    <div class="user-input-container">
+      <template is="dom-if" if="[[renderMic]]">
+        <div class="speach-indicator" on-click="_micTapHandler">
+          <span class="bubble"></span>
+          <iron-icon icon="botcons:mic"></iron-icon>
+        </div>
+      </template>
+      <div class="text-field">
+        <paper-input label="Say something..." no-label-float on-keydown="_inputKeydownHandler" value="{{value}}" on-iron-ajax-error="_botResponseError"></paper-input>
+        <paper-icon-button icon="botcons:send" on-click="_sendHandler"></paper-icon-button>
+      </div>
+    </div>
+  </template>
+  <script>
+    /**
+     * @customElement
+     * @polymer
+     */
+    class UserInput extends Polymer.Element {
+      static get is() { return 'user-input'; }
+      static get properties() {
+        return {
+          /**
+           * User entered or recognized value
+           */
+          value: {
+            type: String,
+            notify: true
+          },
+          /**
+           * Flag that determines if speach recognition API is available.
+           */
+          hasSpeachRecognition: {
+            type: Boolean,
+            readOnly: true,
+            value: function() {
+              return 'webkitSpeechRecognition' in window;
+            }
+          },
+          /**
+           * Microphone permissions are already granted to the user.
+           * Can use microphone API.
+           */
+          micGranted: Boolean,
+          /**
+           * Never asked for microphone permissions.
+           */
+          micPrompt: Boolean,
+          /**
+           * Microphone permissions has ben denied by the user
+           * or the API (Permissions or SpeechRecognition) is not supported
+           * by current browser.
+           */
+          micDenied: Boolean,
+          /**
+           * Computed value, true if the microphone icon can be rendered,
+           */
+          renderMic: {
+            type: Boolean,
+            readOnly: true,
+            computed: '_computeRenderMic(hasSpeachRecognition, micGranted, micPrompt, micDenied)'
+          },
+          /**
+           * True if the element is currently rendered by the parent element.
+           */
+          opened: Boolean,
+          /**
+           * True if the microphone is currently active
+           */
+          listening: {
+            type: Boolean,
+            reflectToAttribute: true,
+            computed: '_computeListening(opened, micGranted, speakerEnabled)',
+            observer: '_listeningChanged'
+          },
+
+          speakerEnabled: Boolean
+        };
+      }
+
+      constructor() {
+        super();
+        this._permissionStatusChanged = this._permissionStatusChanged.bind(this);
+        this._speachResultHandler = this._speachResultHandler.bind(this);
+        this._speachErrorHandler = this._speachErrorHandler.bind(this);
+        this._speachEndHandler = this._speachEndHandler.bind(this);
+      }
+
+      connectedCallback() {
+        super.connectedCallback();
+        if (!this._permissionQuery) {
+          this.checkPermissions();
+        }
+      }
+      /**
+       * Checks for `microphone` permissions state.
+       */
+      checkPermissions() {
+        if (!navigator.permissions || !navigator.permissions.query || !this.hasSpeachRecognition) {
+          this._permissionQuery = Promise.resolve({
+            state: 'denied'
+          });
+          return;
+        }
+        this._permissionQuery = navigator.permissions.query({name:'microphone'})
+        .then((result) => {
+          this._setPermissions(result.state);
+          result.onchange = this._permissionStatusChanged;
+        });
+      }
+      /**
+       * Handler for permission change state events.
+       *
+       * @param {Event} e
+       */
+      _permissionStatusChanged(e) {
+        const state = e.target.state;
+        this._setPermissions(state);
+      }
+      /**
+       * Sets permissions state depending on current `state` value.
+       *
+       * @param {String} state Permissions API state.
+       */
+      _setPermissions(state) {
+        if (state === 'granted') {
+          this.micGranted = true;
+          if (this.micPrompt) {
+            this.micPrompt = false;
+          }
+          if (this.micPrompt) {
+            this.micDenied = false;
+          }
+        } else if (state === 'prompt') {
+          this.micPrompt = true;
+          if (this.micGranted) {
+            this.micGranted = false;
+          }
+          if (this.micPrompt) {
+            this.micDenied = false;
+          }
+        } else {
+          this.micDenied = true;
+          if (this.micGranted) {
+            this.micGranted = false;
+          }
+          if (this.micPrompt) {
+            this.micDenied = false;
+          }
+        }
+      }
+      /**
+       * Computes value for `renderMic` property.
+       *
+       * @param {Boolean} micGranted
+       * @param {Boolean} micPrompt
+       * @return {Boolean}
+       */
+      _computeRenderMic(hasSpeachRecognition, micGranted, micPrompt) {
+        return !!(hasSpeachRecognition && (micPrompt || micGranted));
+      }
+
+      _computeListening(opened, micGranted, speakerEnabled) {
+        return !!(opened && micGranted && speakerEnabled);
+      }
+
+      _listeningChanged(state) {
+        if (state) {
+          this.startListening();
+        }
+      }
+
+      startListening() {
+        /* global webkitSpeechRecognition */
+        if (this.__recognition) {
+          this._speachEndHandler();
+        }
+        const recognition = new webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        recognition.addEventListener('result', this._speachResultHandler);
+        recognition.addEventListener('error', this._speachErrorHandler);
+        recognition.addEventListener('end', this._speachEndHandler);
+        recognition.start();
+        this.__recognition = recognition;
+        this.listening = true;
+      }
+
+      _speachResultHandler(e) {
+        console.log(e);
+      }
+
+      _speachErrorHandler(e) {
+        switch (e.error) {
+          case 'no-speech':
+            console.log('No speach');
+            this.listening = false;
+            break;
+          default:
+            break;
+        }
+      }
+      /**
+       * Clears the recognition object when not used.
+       */
+      _speachEndHandler() {
+        const recognition = this.__recognition;
+        recognition.removeEventListener('result', this._speachResultHandler);
+        recognition.removeEventListener('error', this._speachErrorHandler);
+        recognition.removeEventListener('end', this._speachEndHandler);
+        this.__recognition = undefined;
+        this.speakerEnabled = false;
+      }
+      /**
+       * Handler for the send button click
+       */
+      _sendHandler() {
+        const value = this.value;
+        if (!value) {
+          return;
+        }
+        const e = new CustomEvent('user-input', {
+          detail: {
+            value: value
+          }
+        });
+        this.dispatchEvent(e);
+        Polymer.RenderStatus.afterNextRender(this, () => {
+          this.value = '';
+        });
+      }
+      /**
+       * Handles "Enter" key and calls `_sendHandler()` if user Enter the input.
+       *
+       * @param {KeyboardEvent} e
+       */
+      _inputKeydownHandler(e) {
+        if (e.key === 'Enter') {
+          this._sendHandler();
+        }
+      }
+      /**
+       * Handler for the microphone click event.
+       */
+      _micTapHandler() {
+        if (this.listening) {
+          this.__recognition.stop();
+        } else if (!this.micDenied) {
+          this.speakerEnabled = true;
+        }
+      }
+
+      _botResponseError(e) {
+        debugger;
+      }
+      /**
+       * Dispatched when user finished input
+       *
+       * @event user-input
+       * @param {String} value User input.
+       */
+    }
+    window.customElements.define(UserInput.is, UserInput);
+  </script>
+</dom-module>

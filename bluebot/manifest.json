@@ -1,0 +1,7 @@
+{
+  "name": "bluebot",
+  "short_name": "bluebot",
+  "description": "Connect Demo Bluebot app",
+  "start_url": "/",
+  "display": "standalone"
+}

@@ -1,0 +1,232 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/polymer/lib/elements/dom-if.html">
+<link rel="import" href="../../bower_components/polymer/lib/elements/dom-repeat.html">
+<link rel="import" href="../../bower_components/app-layout/app-header-layout/app-header-layout.html">
+<link rel="import" href="../../bower_components/app-layout/app-header/app-header.html">
+<link rel="import" href="../../bower_components/app-layout/app-toolbar/app-toolbar.html">
+<link rel="import" href="../../bower_components/anypoint-styles/typography.html">
+<link rel="import" href="../../bower_components/anypoint-styles/colors.html">
+<link rel="import" href="../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../../bower_components/paper-input/paper-input.html">
+<link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../conversation-item/conversation-item.html">
+<link rel="import" href="../user-input/user-input.html">
+<link rel="import" href="../botcons.html">
+<dom-module id="bluebot-app">
+  <template>
+    <style>
+    :host {
+      display: block;
+
+      @apply --anypoint-font-body;
+    }
+    app-header-layout {
+      background: rgb(58,59,60);
+      background: linear-gradient(133deg, var(--anypoint-color-steel3) 0%, var(--anypoint-color-steel5) 40%, var(--anypoint-color-steel5) 60%, var(--anypoint-color-steel3) 100%);
+    }
+    app-header {
+      background-color: #000;
+    }
+    app-toolbar {
+      color: #fff;
+      --app-toolbar-font-size: 26px;
+    }
+
+    .conversation {
+      max-width: 600px;
+      margin: 24px auto;
+      @apply --layout-vertical-reverse;
+    }
+
+    conversation-item {
+      margin: 12px 0;
+    }
+
+    user-input {
+      margin-top: 20px;
+    }
+
+    .page {
+      overflow: auto;
+      padding-bottom: 40px;
+    }
+    </style>
+    <app-header-layout fullbleed>
+      <app-header slot="header" fixed>
+        <app-toolbar>
+          <div main-title>Blue Bot</div>
+        </app-toolbar>
+      </app-header>
+      <div class="page">
+        <section role="main" class="conversation">
+          <template is="dom-if" if="[[awatingTextEntry]]">
+            <user-input opened="[[awatingTextEntry]]" on-user-input="_userQuery"></user-input>
+          </template>
+
+          <template is="dom-repeat" items="[[messages]]" sort="_messageSort" observe="time">
+            <conversation-item thinking="[[item.thinking]]" actor="[[item.actor]]">
+              <template is="dom-if" if="[[item.message]]">
+                <p slot="sentence">[[item.message]]</p>
+              </template>
+              <template is="dom-if" if="[[item.icon]]" restamp>
+                <iron-icon slot="icon" icon="botcons:send"></iron-icon>
+              </template>
+            </conversation-item>
+          </template>
+          
+        </section>
+      </div>
+    </app-header-layout>
+    <iron-ajax id="request" url="http://order-change-fullfilment.cloudhub.io/request" handle-as="json" method="POST" content-type="application/json"></iron-ajax>
+  </template>
+  <script>
+    /**
+     * @customElement
+     * @polymer
+     */
+    class BluebotApp extends Polymer.Element {
+      static get is() { return 'bluebot-app'; }
+      static get properties() {
+        return {
+          /**
+           * List of messages from bot and from the user.
+           *
+           * @type {Array<Object>}
+           */
+          messages: {
+            type: Array,
+            value: function() {
+              return [];
+            }
+          },
+          /**
+           * If true, text field is displayed and the bot is ready to listen.
+           */
+          awatingTextEntry: Boolean
+        };
+      }
+
+      ready() {
+        super.ready();
+        this.begin();
+      }
+      /**
+       * Begins interaction with the user.
+       * This should take at most 2 seconds.
+       */
+      begin() {
+        setTimeout(() => this.sendGreetings(), 500);
+        setTimeout(() => this.sendInto(), 1000);
+        setTimeout(() => this.awatingTextEntry = true, 1500);
+      }
+      /**
+       * Sends "hi" message
+       */
+      sendGreetings() {
+        this.appendConversationMessage('bot', 'hi');
+      }
+      /**
+       * Sends "hi" message
+       */
+      sendInto() {
+        this.appendConversationMessage('bot', 'How can I help you today?');
+      }
+      /**
+       * Appends text conversation message between actors.
+       *
+       * @param {String} actor Actor type. `bot` or `human`. Default to `bot`.
+       * @param {?String} message Message to render. If not set, the `thinking`
+       * state will be forced.
+       * @param {?String} icon User icon. Default to default user image.
+       * @return {Number} Index of inserted message
+       */
+      appendConversationMessage(actor, message, icon) {
+        this.push('messages', {
+          actor,
+          message,
+          icon,
+          thinking: !message,
+          time: Date.now()
+        });
+        return this.messages.length -1;
+      }
+      /**
+       * Handles user query.
+       * Calls `askBot()` with received query.
+       *
+       * @param {CustomEvent} e `user-input` event from `user-input` element.
+       */
+      _userQuery(e) {
+        this.askBot(e.detail.value);
+      }
+      /**
+       * Adds user input to the list of messages, sends query to the server
+       * and finally it add "thinking" bot message
+       *
+       * @param {String} query User query
+       */
+      askBot(query) {
+        this.appendConversationMessage('human', query, 'botcons:send');
+        setTimeout(() => {
+          const index = this.appendConversationMessage('bot');
+          this.makeRequest(index, query);
+        }, 350);
+      }
+      /**
+       * Makes request to the server.
+       *
+       * @param {Number} botIndex Message index so the response is inserted to
+       * the right container.
+       * @param {String} query User query
+       * @return {Promise}
+       */
+      makeRequest(botIndex, query) {
+        this.$.request.body = {
+          query,
+          lang: 'en',
+          sessionId: '123'
+        };
+        const request = this.$.request.generateRequest();
+        return request.completes
+        .then((req) => {
+          console.log(req);
+          //response.result.fulfillment.speech <- TBD
+          debugger;
+        })
+        .catch(() => {
+          this.set('messages.errored', true);
+        });
+      }
+      /**
+       * Sorts messages in the view.
+       *
+       * This is a CSS trics to use as less JS code as possible.
+       * The messages are rendered in flex layout in reverse order.
+       * Meaning the repeater has to sort messages from newest to the oldest
+       * so they all going to be rendered at the bottom.
+       *
+       * User input itself is a first element on the list and therefore
+       * always at the bottom.
+       *
+       * @todo Pawel: When the list scrolls outside the bounds for the first
+       * time it goes out of the viewport. Handle this and scroll to (0,0).
+       *
+       * @param {Object} a
+       * @param {Object} b
+       * @return {Number} As usual: `-1`, `0` or `1`.
+       */
+      _messageSort(a, b) {
+        if (a.time > b.time) {
+          return -1;
+        }
+        if (a.time < b.time) {
+          return 1;
+        }
+        return 0;
+      }
+    }
+
+    window.customElements.define(BluebotApp.is, BluebotApp);
+  </script>
+</dom-module>
