@@ -10,6 +10,7 @@
 <link rel="import" href="../../bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="../../bower_components/paper-input/paper-input.html">
 <link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../../bower_components/uuid-generator/uuid-generator.html">
 <link rel="import" href="../conversation-item/conversation-item.html">
 <link rel="import" href="../user-input/user-input.html">
 <link rel="import" href="../botcons.html">
@@ -78,9 +79,13 @@
         </section>
       </div>
     </app-header-layout>
-    <iron-ajax id="request" url="http://order-change-fullfilment.cloudhub.io/request" handle-as="json" method="POST" content-type="application/json" on-iron-ajax-error="_botResponseError"></iron-ajax>
+    <iron-ajax id="request" url="http://order-change-fullfilment-app.cloudhub.io/api/request" handle-as="json" method="POST" content-type="application/json" on-iron-ajax-error="_botResponseError"></iron-ajax>
+    <uuid-generator last-uuid="{{sessionId}}"></uuid-generator>
   </template>
   <script>
+  const sisKey = 'api.session.id';
+  const uKey = 'api.session.user';
+  const rKey = 'api.session.registered';
     /**
      * @customElement
      * @polymer
@@ -103,12 +108,42 @@
           /**
            * If true, text field is displayed and the bot is ready to listen.
            */
-          awatingTextEntry: Boolean
+          awatingTextEntry: Boolean,
+          /**
+           * API session id to be send with every request.
+           */
+          sessionId: String,
+          /**
+           * A user name to use in the UI.
+           */
+          sessionOwner: String,
+          /**
+           * True if the session has been succesfully registered
+           * in the backend.
+           */
+          sessionRegistered: Boolean,
+          /**
+           * Current context of the conversation.
+           * Context always has a `state` propery describing state of the
+           * application (waiting for user input to do somethind, waiting for
+           * selection for somethind etc...). This is used when user make an
+           * action to determine proper response.
+           * @type {Object}
+           */
+          currentContext: {
+            type: Object,
+            value: function() {
+              return {
+                state: 'intro'
+              };
+            }
+          }
         };
       }
 
       ready() {
         super.ready();
+        this.recoverSession();
         this.begin();
       }
       /**
@@ -116,9 +151,42 @@
        * This should take at most 2 seconds.
        */
       begin() {
+        if (!this.sessionOwner) {
+          this.beginUserIntro();
+          return;
+        }
+        if (!this.sessionRegistered) {
+          this.beginRegistrationWithUser();
+          return;
+        }
+        // setTimeout(() => this.sendGreetings(), 500);
+        // setTimeout(() => this.sendIntro(), 1000);
+        // setTimeout(() => this.awatingTextEntry = true, 2000);
+      }
+      /**
+       * Default flow for newely created session.
+       * Says Hi and ask user for name.
+       */
+      beginUserIntro() {
         setTimeout(() => this.sendGreetings(), 500);
-        setTimeout(() => this.sendInto(), 1000);
-        setTimeout(() => this.awatingTextEntry = true, 1500);
+        setTimeout(() => this.sendIntro(), 1000);
+        setTimeout(() => {
+          this.awatingTextEntry = true;
+          this.currentContext.state = 'user-name-query';
+        }, 2000);
+      }
+      /**
+       * Secondary flow when user gave his/her name but registration was
+       * unsuccessfull and the page was reloaded.
+       */
+      beginRegistrationWithUser() {
+        setTimeout(() => {
+          this.appendConversationMessage('bot', 'Welcome back ' + this.sessionOwner);
+        }, 500);
+        setTimeout(() => {
+          this.appendConversationMessage('bot');
+          this.registerNewSession();
+        }, 900);
       }
       /**
        * Sends "hi" message
@@ -129,8 +197,8 @@
       /**
        * Sends "hi" message
        */
-      sendInto() {
-        this.appendConversationMessage('bot', 'How can I help you today?');
+      sendIntro() {
+        this.appendConversationMessage('bot', 'Please, tell me how should I call you?');
       }
       /**
        * Appends text conversation message between actors.
@@ -158,7 +226,15 @@
        * @param {CustomEvent} e `user-input` event from `user-input` element.
        */
       _userQuery(e) {
-        this.askBot(e.detail.value);
+        switch (this.currentContext.state) {
+          case 'user-name-query':
+            this.awatingTextEntry = false;
+            this.finishUserName(e.detail.value);
+            break;
+          case 'awaiting-query':
+            this.askBot(e.detail.value);
+            break;
+        }
       }
       /**
        * Adds user input to the list of messages, sends query to the server
@@ -233,7 +309,108 @@
       _botResponseError(e) {
         console.log(e.detail.request.response);
         const last = this.messages.length - 1;
-        this.set(`messages.${last}.errored`, true);
+        switch (this.currentContext.state) {
+          case 'intro':
+            this.set(`messages.${last}.errored`, true);
+            break;
+        }
+      }
+      /**
+       * Restores session ID from session storage or generates and stores new
+       * one.
+       * Session ID is used with API.
+       */
+      recoverSession() {
+        let id = sessionStorage.getItem(sisKey);
+        if (!id) {
+          id = this.shadowRoot.querySelector('uuid-generator').generate();
+          sessionStorage.setItem(sisKey, id);
+          this.sessionId = id;
+          this.sessionRegistered = false;
+          return;
+        }
+        this.sessionId = id;
+        let user = sessionStorage.getItem(uKey);
+        if (!user) {
+          this.sessionRegistered = false;
+          return;
+        }
+        this.sessionOwner = user;
+        this.sessionRegistered = sessionStorage.getItem(rKey) === 'true';
+      }
+
+      /**
+       * Finishes user flow and registeres the session.
+       * @param {String} userName User input.
+       */
+      finishUserName(userName) {
+        this.sessionOwner = userName;
+        sessionStorage.setItem(uKey, userName);
+        this.appendConversationMessage('bot', 'From this time on, I will call you ' + userName);
+        this.registerNewSession();
+      }
+      /**
+       * Registers a session id in the API backed.
+       */
+      registerNewSession() {
+        this.$.request.body = {
+          event: {
+            name: 'custom_welcome',
+            data: {
+              user_name: 'Uri'
+            }
+          },
+          lang: 'en',
+          sessionId: this.sessionId
+        };
+        const error = 'It looks like my API is having a bad day today. I can\'t connect to the application server ☹';
+        const request = this.$.request.generateRequest();
+        return request.completes
+        .then((req) => {
+          const body = req.response;
+          if (body.status.code === 200) {
+            this._finishSessionRegistration();
+          } else {
+            this.appendConversationMessage('bot', error);
+          }
+        })
+        .catch(() => {
+          this.appendConversationMessage('bot', error);
+        });
+      }
+      /**
+       * Called after 200 response from refistration endpoint.
+       */
+      _finishSessionRegistration() {
+        // Now the boot should ask for a random picture of a kitty
+        // and render it. After this it should ask how can it help today.
+        this.currentContext.state = 'random-kitty-search';
+        this.$.request.body = {
+          event: {
+            name: 'show-me-the-kittens',
+          },
+          lang: 'en',
+          sessionId: this.sessionId
+        };
+        const messageId = this.appendConversationMessage('bot');
+        const request = this.$.request.generateRequest();
+        return request.completes
+        .then((req) => {
+          const body = req.response;
+          this.set(`messages.${messageId}.message`, 'Look what i have found for you today');
+          setTimeout(() => {
+            this.appendConversationImage(body.result);
+          }, 500);
+
+          setTimeout(() => {
+            this.appendConversationMessage('bot', 'How can I help you today, ' + this.sessionOwner + '?');
+            this.currentContext.state = 'awaiting-query';
+          }, 1500);
+        })
+        .catch(() => {
+          this.appendConversationMessage('bot', 'How can I help you today, ' + this.sessionOwner + '?');
+          this.currentContext.state = 'awaiting-query';
+        });
       }
     }
 

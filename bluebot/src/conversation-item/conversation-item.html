@@ -14,7 +14,7 @@
 
     .content {
       @apply --layout-horizontal;
-      @apply --layout-start;
+      @apply --layout-end;
       margin: 0 24px;
     }
 
@@ -50,7 +50,7 @@
 
     .message {
       @apply --layout-horizontal;
-      @apply --layout-start;
+      @apply --layout-end;
     }
 
     :host([actor="human"]) .message {
@@ -58,7 +58,7 @@
     }
 
     .triangle {
-      margin-top: 16px;
+      margin-bottom: 16px;
     }
 
     .sentence {
@@ -145,7 +145,7 @@
     <div class="content">
       <div class="icon">
         <slot name="icon">
-          <iron-icon icon="botcons:android"></iron-icon>
+          <iron-icon icon="botcons:boticon"></iron-icon>
         </slot>
         <template is="dom-if" if="[[errored]]">
           <iron-icon class="error" icon="botcons:error"></iron-icon>
