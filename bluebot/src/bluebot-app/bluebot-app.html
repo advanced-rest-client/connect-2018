@@ -12,6 +12,7 @@
 <link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
 <link rel="import" href="../../bower_components/uuid-generator/uuid-generator.html">
 <link rel="import" href="../conversation-item/conversation-item.html">
+<link rel="import" href="../orders-list/orders-list.html">
 <link rel="import" href="../user-input/user-input.html">
 <link rel="import" href="../botcons.html">
 <dom-module id="bluebot-app">
@@ -66,20 +67,27 @@
           </template>
 
           <template is="dom-repeat" items="[[messages]]" sort="_messageSort" observe="time">
-            <conversation-item thinking="[[item.thinking]]" actor="[[item.actor]]" errored="[[item.errored]]">
-              <template is="dom-if" if="[[item.message]]">
-                <p slot="sentence">[[item.message]]</p>
-              </template>
-              <template is="dom-if" if="[[item.icon]]" restamp>
-                <iron-icon slot="icon" icon="botcons:send"></iron-icon>
-              </template>
-            </conversation-item>
+
+            <template is="dom-if" if="[[item.isText]]">
+              <conversation-item thinking="[[item.thinking]]" actor="[[item.actor]]" errored="[[item.errored]]">
+                <template is="dom-if" if="[[item.message]]">
+                  <p slot="sentence">[[item.message]]</p>
+                </template>
+                <template is="dom-if" if="[[item.icon]]" restamp>
+                  <iron-icon slot="icon" icon="botcons:send"></iron-icon>
+                </template>
+              </conversation-item>
+            </template>
+
+            <template is="dom-if" if="[[item.isOrdersList]]">
+              <orders-list orders="[[item.orders]]"></orders-list>
+            </template>
           </template>
 
         </section>
       </div>
     </app-header-layout>
-    <iron-ajax id="request" url="http://order-change-fullfilment-app.cloudhub.io/api/request" handle-as="json" method="POST" content-type="application/json" on-iron-ajax-error="_botResponseError"></iron-ajax>
+    <iron-ajax id="request" url="http://order-change-fullfilment.cloudhub.io/request" handle-as="json" method="POST" content-type="application/json" on-iron-ajax-error="_botResponseError"></iron-ajax>
     <uuid-generator last-uuid="{{sessionId}}"></uuid-generator>
   </template>
   <script>
@@ -184,7 +192,6 @@
           this.appendConversationMessage('bot', 'Welcome back ' + this.sessionOwner);
         }, 500);
         setTimeout(() => {
-          this.appendConversationMessage('bot');
           this.registerNewSession();
         }, 900);
       }
@@ -215,6 +222,23 @@
           message,
           icon,
           thinking: !message,
+          isText: true,
+          isOrdersList: false,
+          time: Date.now()
+        });
+        return this.messages.length -1;
+      }
+      /**
+       * Appends list of orders.
+       *
+       * @param {Array} orders List of orders from API response.
+       * @return {Number} Index of inserted message
+       */
+      appendProductListMessage(orders) {
+        this.push('messages', {
+          isText: false,
+          isOrdersList: true,
+          orders,
           time: Date.now()
         });
         return this.messages.length -1;
@@ -232,6 +256,7 @@
             this.finishUserName(e.detail.value);
             break;
           case 'awaiting-query':
+          case 'order-selection-query':
             this.askBot(e.detail.value);
             break;
         }
@@ -244,34 +269,28 @@
        */
       askBot(query) {
         this.appendConversationMessage('human', query, 'botcons:send');
-        setTimeout(() => {
-          const index = this.appendConversationMessage('bot');
-          this.makeRequest(index, query);
-        }, 350);
+        setTimeout(() => this.makeRequest(query), 350);
       }
       /**
        * Makes request to the server.
        *
-       * @param {Number} botIndex Message index so the response is inserted to
-       * the right container.
        * @param {String} query User query
        * @return {Promise}
        */
-      makeRequest(botIndex, query) {
+      makeRequest(query) {
+        const index = this.appendConversationMessage('bot');
         this.$.request.body = {
           query,
           lang: 'en',
-          sessionId: '123'
+          sessionId: this.sessionId
         };
+        this.awatingTextEntry = false;
         const request = this.$.request.generateRequest();
         return request.completes
-        .then((req) => {
-          console.log(req);
-          //response.result.fulfillment.speech <- TBD
-          debugger;
-        })
+        .then((req) => this._processServerResponse(index, req.response))
         .catch(() => {
-          this.set(`messages.${botIndex}.errored`, true);
+          debugger;
+          this.set(`messages.${index}.errored`, true);
         });
       }
       /**
@@ -353,16 +372,18 @@
        * Registers a session id in the API backed.
        */
       registerNewSession() {
+        console.log('Registering welcome');
         this.$.request.body = {
           event: {
             name: 'custom_welcome',
             data: {
-              user_name: 'Uri'
+              user_name: this.sessionOwner
             }
           },
           lang: 'en',
           sessionId: this.sessionId
         };
+        this.appendConversationMessage('bot');
         const error = 'It looks like my API is having a bad day today. I can\'t connect to the application server ☹';
         const request = this.$.request.generateRequest();
         return request.completes
@@ -392,25 +413,68 @@
           lang: 'en',
           sessionId: this.sessionId
         };
-        const messageId = this.appendConversationMessage('bot');
+        // const messageId = this.appendConversationMessage('bot');
+        const messageId = this.messages.length - 1;
         const request = this.$.request.generateRequest();
         return request.completes
         .then((req) => {
           const body = req.response;
-          this.set(`messages.${messageId}.message`, 'Look what i have found for you today');
-          setTimeout(() => {
-            this.appendConversationImage(body.result);
-          }, 500);
+          if (body.result.action === 'input.unknown') {
+            console.error('Action unknown');
+            this.splice('messages', messageId, 1);
+            this._helpTodayMessage();
+          } else {
+            this.set(`messages.${messageId}.message`, 'Look what i have found for you today');
+            setTimeout(() => {
+              this.appendConversationImage(body.result);
+            }, 500);
+            setTimeout(() => {
+              this._helpTodayMessage();
+            }, 1500);
+          }
 
-          setTimeout(() => {
-            this.appendConversationMessage('bot', 'How can I help you today, ' + this.sessionOwner + '?');
-            this.currentContext.state = 'awaiting-query';
-          }, 1500);
         })
         .catch(() => {
           this.appendConversationMessage('bot', 'How can I help you today, ' + this.sessionOwner + '?');
           this.currentContext.state = 'awaiting-query';
         });
+      }
+
+      _helpTodayMessage() {
+        this.appendConversationMessage('bot', 'How can I help you today, ' + this.sessionOwner + '?');
+        this.currentContext.state = 'awaiting-query';
+        this.awatingTextEntry = true;
+      }
+
+      appendConversationImage(body) {
+        console.log('appendConversationImage', body);
+      }
+
+      _processServerResponse(index, res) {
+        const result = res.result;
+        const fulfillment = result.fulfillment;
+        switch (result.action) {
+          case 'list-orders':
+            this._listOrders(index, fulfillment.data);
+            break;
+          default:
+            const first = fulfillment.messages.shift();
+            this.set(`messages.${index}.message`, first.speech);
+            this.set(`messages.${index}.thinking`, false);
+            fulfillment.messages.forEach((message) => this.appendConversationMessage('bot', message.speech));
+            this.awatingTextEntry = true;
+            this.currentContext.state = 'awaiting-query';
+        }
+      }
+
+      _listOrders(index, data) {
+        const txt = data.text;
+        this.set(`messages.${index}.message`, txt);
+        this.set(`messages.${index}.thinking`, false);
+
+        this.appendProductListMessage(data.orders);
+        this.currentContext.state = 'order-selection-query';
+        this.awatingTextEntry = true;
       }
     }
 

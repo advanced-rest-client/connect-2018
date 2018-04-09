@@ -1,0 +1,36 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
+<link rel="import" href="order-item.html">
+
+<dom-module id="orders-list">
+  <template>
+    <style>
+    :host {
+      @apply --layout-horizontal;
+      @apply --layout-center;
+      overflow: auto;
+    }
+    </style>
+    <template is="dom-repeat" items="[[orders]]">
+      <order-item order="[[item]]"></order-item>
+    </template>
+  </template>
+  <script>
+  /**
+   * @customElement
+   * @polymer
+   */
+  class OrdersList extends Polymer.Element {
+    static get is() { return 'orders-list'; }
+    static get properties() {
+      return {
+        /**
+         * List of orders returned by the API.
+         */
+        orders: Array
+      };
+    }
+  }
+  window.customElements.define(OrdersList.is, OrdersList);
+  </script>
+</dom-module>

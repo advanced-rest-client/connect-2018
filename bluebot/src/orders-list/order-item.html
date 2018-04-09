@@ -1,0 +1,93 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
+<link rel="import" href="../../bower_components/anypoint-styles/typography.html">
+<link rel="import" href="../../bower_components/anypoint-styles/colors.html">
+<link rel="import" href="../botcons.html">
+
+<dom-module id="order-item">
+  <template>
+    <style>
+    :host {
+      display: block;
+      background-color: #fff;
+      margin: 20px;
+      border-radius: 4px;
+      @apply --anypoint-font-body;
+    }
+
+    .icon {
+      padding: 4px;
+    }
+
+    iron-icon {
+      width: 120px;
+      height: 120px;
+    }
+
+    .summary {
+      padding: 4px 8px;
+      background: var(--anypoint-color-teal3);
+      background: linear-gradient(0deg, var(--anypoint-color-coreBlue3) 0%, var(--anypoint-color-teal3) 100%);
+      color: #fff;
+    }
+    </style>
+    <div class="container">
+      <div class="icon">
+        <iron-icon src="[[image]]"></iron-icon>
+      </div>
+      <div class="summary">
+        <div class="status">[[status]]</div>
+        <div class="cost">$[[order.totalAmountPrice]]</div>
+      </div>
+    </div>
+  </template>
+  <script>
+    /**
+     * Single order item.
+     * Displays image from the first product and order summary.
+     * @customElement
+     * @polymer
+     */
+    class OrderItem extends Polymer.Element {
+      static get is() { return 'order-item'; }
+      static get properties() {
+        return {
+          /**
+           * List of orders returned by the API.
+           */
+          order: Object,
+          /**
+           * Computed value of image to display.
+           */
+          image: {
+            type: String,
+            computed: '_computeImage(order.products.*)'
+          },
+          status: {
+            type: String,
+            computed: '_computeOrderStatus(order.shippingStatus)'
+          }
+        };
+      }
+
+      _computeImage(record) {
+        if (!record || !record.base || !record.base.length) {
+          return;
+        }
+        const products = record.base;
+        const image = products[0].image;
+        return image ? image.url : undefined;
+      }
+
+      _computeOrderStatus(shippingStatus) {
+        switch (shippingStatus) {
+          case 'non-shipped': return 'Not shipped';
+          default: return shippingStatus;
+        }
+      }
+    }
+
+    window.customElements.define(OrderItem.is, OrderItem);
+  </script>
+</dom-module>
