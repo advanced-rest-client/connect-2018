@@ -1,0 +1,276 @@
+<!--
+@license
+Copyright 2018 MuleSoft.
+All rights reserverd.
+-->
+<link rel="import" href="../polymer/lib/elements/custom-style.html">
+<link rel="import" href="typography.html">
+<link rel="import" href="colors.html">
+<!--
+The API Console main stylesheet.
+It is a Polymer's custom style element. It will propagate variables and mixins on all elements;
+-->
+<custom-style>
+  <style is="custom-style">
+  :root {
+    /* Commonly used properties in Polymer elements */
+    --primary-color: var(--anypoint-color-primary);
+    --secondary-color: var(--anypoint-color-secondary);
+    --primary-background-color: var(--anypoint-color-tertiary);
+    --accent-color: var(--anypoint-color-violet3);
+
+    /* API components fonts definition. Basically copies Anypoint typography into ARC prefix. */
+    --arc-font-common-base: {
+      @apply --anypoint-font-common-base;
+    };
+
+    --arc-font-common-code: {
+      @apply --anypoint-font-common-code;
+    };
+
+    --arc-font-common-nowrap: {
+      @apply --anypoint-font-common-nowrap;
+    };
+
+    --arc-font-display1: {
+      @apply --arc-font-common-base;
+
+      font-size: 34px;
+      line-height: 40px;
+    };
+
+    --arc-font-headline: {
+      @apply --arc-font-common-base;
+
+      font-weight: 100;
+      letter-spacing: -.03em;
+      font-size: 24px;
+      line-height: 32px;
+    };
+
+    --arc-font-title: {
+      @apply --arc-font-common-base;
+      @apply --arc-font-common-nowrap;
+
+      font-weight: 100;
+      letter-spacing: -.02em;
+      font-size: 20px;
+      line-height: 28px;
+    };
+
+    --arc-font-subhead: {
+      @apply --arc-font-common-base;
+
+      font-weight: 400;
+      font-size: 16px;
+      line-height: 24px;
+    };
+
+    --arc-font-body2: {
+      @apply --anypoint-font-body;
+      font-weight: 500;
+      font-size: 14px;
+    };
+
+    --arc-font-body1: {
+      @apply --anypoint-font-body;
+      font-size: 14px;
+    };
+
+    --arc-font-caption: {
+      @apply --arc-font-common-base;
+      @apply --arc-font-common-nowrap;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.011em;
+      line-height: 20px;
+    };
+
+    --select-text: {
+      @apply --arc-font-common-base;
+      -webkit-user-select: text;
+      cursor: text;
+    };
+
+    --arc-link: {
+      @apply --arc-font-common-base;
+      color: #00A1DF;
+    };
+
+    --arc-font-code1: {
+      @apply --anypoint-font-code;
+      font-size: 14px;
+    };
+
+    /* THEME FOR API COMPONENTS */
+
+    /* Mixin applied to all the "missing info" paragraphs. By deafult all elements this kind are the <p> elements. But it may vary. */
+    --no-info-message: {
+      @apply --arc-font-body1;
+      font-style: italic;
+    };
+    /* Mixin applied to all labels that are form elements */
+    --form-label: {
+      font-weight: 500;
+    };
+
+    /* Mixin applied to all code blocks that highlights schemas / types / etc. All code block uses the `prism-theme-default`. */
+    --code-block: {
+      @apply --arc-font-common-code;
+    };
+    /* Code Mirror and code related components */
+    --arc-code-mirror-background-color: #f5f2f0;
+    --code-mirror-editor: {
+      background-color: var(--arc-code-mirror-background-color);
+      z-index: 0;
+      display: block;
+    };
+    --code-mirror-wrapper: {
+      display: block;
+      height: 100%;
+    };
+    --code-mirror-string-color: #1341a9;
+    --code-mirror-number-color: #03a9f4;
+    --code-mirror-atom-color: #0288d1;
+    --code-mirror-punctuation-color: #757575;
+    --code-type-text-value-color: var(--code-mirror-string-color);
+    --code-type-number-value-color: var(--code-mirror-number-color);
+    --code-type-boolean-value-color: var(--code-mirror-atom-color);
+    --code-type-null-value-color: var(--code-mirror-atom-color);
+    --code-punctuation-value-color: var(--code-mirror-punctuation-color);
+    --code-type-link-color: #757575;
+    --code-array-index-color: rgba(1, 87, 155, 0.57);
+    --code-background-color: var(--anypoint-color-aluminum2);
+    /* API navigation element */
+    --api-navigation-list-item-color: #616161;
+    --api-navigation-list-item-selected-background-color: transparent;
+    --api-navigation-list-item-selected-color: var(--api-navigation-list-item-color);
+    --api-navigation-list-item: {
+      border-left: 4px transparent solid;
+    };
+    --api-navigation-list-item-selected: {
+      border-left: 4px var(--anypoint-color-primary) solid;
+    };
+    --api-navigation-list-item-hovered: {
+      border-left: 4px var(--anypoint-color-coreBlue1) solid;
+    };
+    /* Main region panels. This is applied to each top level panels that are in the main region. */
+    --main-region-panel: {
+      margin-bottom: 20px;
+      max-width: 900px;
+      margin-left: 16px;
+    }
+    /* Response view panel */
+    --response-view: {
+      @apply --main-region-panel;
+    };
+    /* Action button is a screen or panel primary action button */
+    --action-button: {
+      background-color: var(--primary-color);
+      color: var(--primary-action-color, #fff);
+    };
+    /* And when it's hovered. */
+    --action-button-hover: {
+      background-color: var(--anypoint-color-coreBlue2);
+      color: white;
+    };
+    /* OAuth 1/2 get token button */
+    --auth-button: {
+      @apply --btn-danger-nofill;
+    };
+    /* OAuth 1/2 get token button when hovered*/
+    --auth-button-hover: {
+      @apply --btn-danger-nofill-hover;
+    };
+    /* Try it forms enable checkbox margin top */
+    --api-url-params-form-enable-checkbox-margin-top: 15px;
+    --api-headers-form-enable-checkbox-margin-top: 15px;
+    /* Try it forms hint icon margin top */
+    --api-url-params-form-hint-icon-margin-top: 5px;
+    --api-headers-editore-hint-icon-margin-top: 5px;
+    /* Try it forms delete icon margin top */
+    --api-headers-form-delete-icon-margin-top: 5px;
+    --api-url-params-editor-editor-subheader: {
+      @apply --arc-font-subhead;
+    };
+    --api-form-action-button-color: var(--primary-color);
+    --api-form-action-button-hover-color: var(--anypoint-color-coreBlue2);
+    --api-form-action-icon-color: var(--primary-color);
+    --api-form-action-icon-hover-color: var(--anypoint-color-coreBlue2);
+
+    /* THEME FOR PAPER ELEMENTS */
+
+    /* Mixin applied to `paper-icon-buttons`.*/
+    --icon-button: {
+      color: rgba(0, 0, 0, 0.54);
+      background-color: transparent;
+      transition: color 0.35s linear;
+    };
+    /* Mixin applied to `paper-icon-buttons` when hovering.*/
+    --icon-button-hover: {
+      color:  var(--primary-color);
+    };
+    /* Paper tabs styling */
+    --paper-tabs-selection-bar-color: var(--anypoint-color-primary);
+    --paper-tab-ink: var(--primary-color);
+    /* Paper tabs container */
+    --paper-tabs-content: {
+      height: calc(100% - 3px);
+      border-bottom: 3px solid rgba(39, 47, 51, 0.12);
+      @apply --anypoint-font-common-base;
+      font-style: normal;
+      color: var(--anypoint-color-steel3);
+    };
+    /* Bottomm selection bar in tabs */
+    --paper-tabs-selection-bar: {
+      border-width: 3px;
+      border-color: var(--primary-color);
+    };
+    /* Paper tab content text */
+    --paper-tab-content: {
+      font-weight: 400;
+    };
+    /* Mixin for a tab content when not selected */
+    --paper-tab-content-unselected: {
+      color: var(--anypoint-color-steel1);
+    };
+    /* Mixin applied to checkbox's label */
+    --paper-checkbox-label: {
+      @apply --arc-font-body1;
+    };
+    /* Paper button mixn */
+    --paper-button: {
+      @apply --anypoint-font-body;
+      font-size: 14px;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 10px 16px;
+      box-sizing: border-box;
+      text-transform: none;
+    };
+    /* Removes ink from paper button */
+    --paper-button-ink-color: transparent;
+    --paper-icon-button-ink-color: transparent;
+    /* A special case for paper input when it is contructed with Anypoint paper-input and using regular input with paper-input container */
+    --paper-input-container-input-input-style: {
+      padding: 0 10px;
+    };
+    /* Paper item element: this is very dirty hack to style paper-dropdown-menu. Part of styling is in the element and the rest is here. */
+    --paper-item: {
+      padding: 0px 10px;
+      border-left: 2px transparent solid;
+      border-right: 2px transparent solid;
+      cursor: pointer;
+      border-left: 2px solid var(--anypoint-color-aluminum4);
+      border-right: 2px solid var(--anypoint-color-aluminum4);
+    };
+    /* There is no such definition in `paper-item` but API components may use it */
+    --paper-item-hover: {
+      padding: 0px 10px;
+      color: var(--anypoint-color-coreBlue3);
+      border-left: 2px var(--anypoint-color-coreBlue3) solid;
+      border-right: 2px var(--anypoint-color-coreBlue3) solid;
+    };
+  }
+  </style>
+</custom-style>

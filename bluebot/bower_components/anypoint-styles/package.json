@@ -1,0 +1,27 @@
+{
+  "name": "@anypoint-components/anypoint-styles",
+  "description": "Anypoint styles definition for API components.",
+  "version": "2.0.0-preview",
+  "license": "(C) MuleSoft. All rights reserved.",
+  "devDependencies": {
+    "@polymer/gen-typescript-declarations": "^1.1.1",
+    "bower": "^1.8.0"
+  },
+  "private": true,
+  "main": "anypoint-styles.html",
+  "author": "Pawel Psztyc",
+  "scripts": {
+    "lint": "polymer lint anypoint-theme.html colors.html din-pro.html typography.thml",
+    "test-sauce": "polymer test --plugin sauce --job-name \"anypoint-styles:local-test\"",
+    "test": "polymer test --plugin local",
+    "update-types": "gen-typescript-declarations --deleteExisting --outDir ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/advanced-rest-client/anypoint-styles.git"
+  },
+  "bugs": {
+    "url": "https://github.com/advanced-rest-client/anypoint-styles/issues",
+    "email": "arc@mulesoft.com"
+  }
+}
